@@ -18,6 +18,17 @@ export interface Driver {
   totalTrips: number;
   experienceYears: number;
   assignedVehicleId?: string;
+  hoursDrivenToday?: number; // Driving tachograph hours (out of 8.0 hrs max)
+}
+
+export interface TollPlaza {
+  id: string;
+  name: string;
+  highway: string;
+  coordinates: [number, number];
+  tollFeeCommercialINR: number;
+  status: 'FASTag Active' | 'Congestion Warning' | 'Clear Passage';
+  lastPassageTime?: string;
 }
 
 export interface CompletedTrip {
@@ -95,6 +106,7 @@ export interface Vehicle {
   alerts: VehicleAlert[];
   tripHistory: CompletedTrip[];
   maintenanceLogs: MaintenanceRecord[];
+  fastTagBalance?: number; // FASTag prepaid balance in INR
 }
 
 export type ViewMode = 'table' | 'grid';
@@ -122,3 +134,4 @@ export interface FleetMetrics {
   avgFuelEfficiencyKmpl: number;
   onTimeDeliveryRate: number;
 }
+

@@ -7,12 +7,14 @@ import { LiveOperationsMap } from './components/map/LiveOperationsMap';
 import { DispatchModal } from './components/modals/DispatchModal';
 import { VehicleDetailsDrawer } from './components/drawer/VehicleDetailsDrawer';
 import { DriverCallModal } from './components/modals/DriverCallModal';
+import { EWayBillModal } from './components/modals/EWayBillModal';
+import { SimulationControlBar } from './components/common/SimulationControlBar';
 import { ActiveTripsView } from './components/views/ActiveTripsView';
 import { DriversView } from './components/views/DriversView';
 import { MaintenanceView } from './components/views/MaintenanceView';
 import { ReportsView } from './components/views/ReportsView';
 import { ToastContainer, ToastMessage } from './components/common/Toast';
-import { Vehicle, Driver, DispatchFormData, VehicleAlert } from './types';
+import { Vehicle, Driver, DispatchFormData, CompletedTrip } from './types';
 import { INITIAL_VEHICLES, INITIAL_DRIVERS, POPULAR_LOCATIONS } from './data/mockData';
 
 export function App() {
@@ -27,6 +29,9 @@ export function App() {
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
   const [preSelectedDispatchVehicleId, setPreSelectedDispatchVehicleId] = useState<string | undefined>();
   const [selectedVehicleForDrawer, setSelectedVehicleForDrawer] = useState<Vehicle | null>(null);
+
+  // E-Way Bill Modal State
+  const [eWayBillVehicle, setEWayBillVehicle] = useState<Vehicle | null>(null);
 
   // Call Driver Modal
   const [callModalState, setCallModalState] = useState<{
@@ -279,6 +284,134 @@ export function App() {
     });
   };
 
+  // Field Simulation 1: Arrival at destination
+  const handleSimulateArrival = () => {
+    const runningTruck = vehicles.find((v) => v.status === 'running');
+    if (!runningTruck || !runningTruck.currentTrip) {
+      addToast('info', 'No Active Deliveries', 'All trucks are presently stationary in yards.');
+      return;
+    }
+
+    const completedRun: CompletedTrip = {
+      id: `TH-${Math.floor(1000 + Math.random() * 9000)}`,
+      route: `${runningTruck.currentTrip.origin.split(' ')[0]} ➔ ${runningTruck.currentTrip.destination.split(' ')[0]}`,
+      origin: runningTruck.currentTrip.origin,
+      destination: runningTruck.currentTrip.destination,
+      distanceKm: 275,
+      durationHours: 5.8,
+      completedAt: 'Just now',
+      fuelConsumedLiters: 78,
+      driverName: runningTruck.driver?.name || 'Assigned Driver',
+      status: 'Delivered'
+    };
+
+    setVehicles((prev) =>
+      prev.map((v) => {
+        if (v.id === runningTruck.id) {
+          return {
+            ...v,
+            status: 'idle',
+            liveSpeedKmh: 0,
+            currentPayloadTons: 0,
+            currentTrip: null,
+            tripHistory: [completedRun, ...v.tripHistory]
+          };
+        }
+        return v;
+      })
+    );
+
+    addToast(
+      'success',
+      'Consignment Delivered Successfully!',
+      `${runningTruck.id} (${runningTruck.plate}) arrived at ${runningTruck.currentTrip.destination}. Manifest closed.`
+    );
+  };
+
+  // Field Simulation 2: Sensor Anomaly
+  const handleSimulateAnomaly = () => {
+    const candidateTruck = vehicles.find((v) => v.status === 'running') || vehicles[0];
+    if (!candidateTruck) return;
+
+    const newAlert = {
+      id: `ALT-${Date.now()}`,
+      type: 'tire_pressure' as const,
+      severity: 'warning' as const,
+      message: 'Rear left tire pressure dropping rapidly (down to 101 PSI)',
+      timestamp: 'Just now'
+    };
+
+    setVehicles((prev) =>
+      prev.map((v) => {
+        if (v.id === candidateTruck.id) {
+          return {
+            ...v,
+            alerts: [newAlert, ...v.alerts]
+          };
+        }
+        return v;
+      })
+    );
+
+    addToast(
+      'warning',
+      'Telemetry Alert Injected',
+      `Diagnostic warning triggered on ${candidateTruck.id} (${candidateTruck.plate}).`
+    );
+  };
+
+  // Export Telemetry Data as CSV
+  const handleExportCSV = () => {
+    const headers = [
+      'Vehicle ID',
+      'License Plate',
+      'Model',
+      'Type',
+      'Status',
+      'Payload Capacity (Tons)',
+      'Current Payload (Tons)',
+      'Fuel Level (%)',
+      'Live Speed (km/h)',
+      'Odometer (km)',
+      'Driver Name',
+      'Driver Phone',
+      'Current Origin',
+      'Current Destination',
+      'Latitude',
+      'Longitude'
+    ];
+
+    const rows = vehicles.map((v) => [
+      v.id,
+      v.plate,
+      `"${v.model}"`,
+      `"${v.type}"`,
+      v.status,
+      v.payloadCapacityTons,
+      v.currentPayloadTons,
+      v.fuelPercent,
+      v.liveSpeedKmh,
+      v.odometerKm,
+      v.driver ? `"${v.driver.name}"` : 'Unassigned',
+      v.driver ? `"${v.driver.phone}"` : '',
+      v.currentTrip ? `"${v.currentTrip.origin}"` : '',
+      v.currentTrip ? `"${v.currentTrip.destination}"` : '',
+      v.coordinates[0],
+      v.coordinates[1]
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `LogiTrack_Fleet_Manifest_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    addToast('info', 'Manifest Export Complete', 'Telemetry dataset downloaded as CSV.');
+  };
+
   // All active alerts for dropdown
   const allAlerts = vehicles.flatMap((v) => v.alerts);
 
@@ -308,7 +441,16 @@ export function App() {
         />
 
         {/* Primary View Area */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-5">
+          {/* Ops Sandbox Bar */}
+          <SimulationControlBar
+            vehicles={vehicles}
+            onSimulateArrival={handleSimulateArrival}
+            onSimulateAnomaly={handleSimulateAnomaly}
+            onExportCSV={handleExportCSV}
+            onOpenEWayBill={(v) => setEWayBillVehicle(v)}
+          />
+
           {/* TAB 1: DASHBOARD (Overview) */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
@@ -463,6 +605,13 @@ export function App() {
         driverName={callModalState.driverName}
         driverPhone={callModalState.driverPhone}
         onClose={() => setCallModalState({ isOpen: false, driverName: '', driverPhone: '' })}
+      />
+
+      {/* National E-Way Bill Modal */}
+      <EWayBillModal
+        isOpen={!!eWayBillVehicle}
+        onClose={() => setEWayBillVehicle(null)}
+        vehicle={eWayBillVehicle}
       />
 
       {/* Toast Notification Container */}

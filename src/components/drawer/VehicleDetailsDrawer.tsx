@@ -526,3 +526,4 @@ export const VehicleDetailsDrawer: React.FC<VehicleDetailsDrawerProps> = ({
     </div>
   );
 };
+

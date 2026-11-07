@@ -147,3 +147,4 @@ export const ActiveTripsView: React.FC<ActiveTripsViewProps> = ({
     </div>
   );
 };
+

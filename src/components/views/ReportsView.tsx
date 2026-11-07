@@ -162,3 +162,4 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ vehicles }) => {
     </div>
   );
 };
+

@@ -60,3 +60,4 @@ export function formatCurrencyINR(amount: number): string {
 export function isDateOverdue(dateStr: string): boolean {
   return new Date(dateStr) < new Date('2026-11-07');
 }
+

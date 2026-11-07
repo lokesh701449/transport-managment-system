@@ -1,4 +1,61 @@
-import { Vehicle, Driver, VehicleAlert, MaintenanceRecord, CompletedTrip } from '../types';
+import { Vehicle, Driver, VehicleAlert, MaintenanceRecord, CompletedTrip, TollPlaza } from '../types';
+
+export const INITIAL_TOLL_PLAZAS: TollPlaza[] = [
+  {
+    id: 'TOLL-01',
+    name: 'Panthangi Toll Plaza',
+    highway: 'NH-65 (Km 54, Hyd ➔ Vja)',
+    coordinates: [17.1850, 78.9650],
+    tollFeeCommercialINR: 345,
+    status: 'FASTag Active',
+    lastPassageTime: '15 mins ago'
+  },
+  {
+    id: 'TOLL-02',
+    name: 'Korlapahad Toll Plaza',
+    highway: 'NH-65 (Km 118, Suryapet)',
+    coordinates: [17.1520, 79.5200],
+    tollFeeCommercialINR: 285,
+    status: 'FASTag Active',
+    lastPassageTime: '32 mins ago'
+  },
+  {
+    id: 'TOLL-03',
+    name: 'Chillakallu RTO Checkpost & Toll',
+    highway: 'NH-65 (Km 201, AP-TS Border)',
+    coordinates: [16.8900, 80.1400],
+    tollFeeCommercialINR: 310,
+    status: 'Clear Passage',
+    lastPassageTime: '5 mins ago'
+  },
+  {
+    id: 'TOLL-04',
+    name: 'Keesara Toll Plaza',
+    highway: 'NH-65 (Km 245, Krishna Basin)',
+    coordinates: [16.6500, 80.4500],
+    tollFeeCommercialINR: 220,
+    status: 'FASTag Active',
+    lastPassageTime: '48 mins ago'
+  },
+  {
+    id: 'TOLL-05',
+    name: 'Thondupally FASTag Gateway',
+    highway: 'NH-44 (Shamshabad Airport Corridor)',
+    coordinates: [17.2150, 78.4100],
+    tollFeeCommercialINR: 195,
+    status: 'FASTag Active',
+    lastPassageTime: '1 hour ago'
+  },
+  {
+    id: 'TOLL-06',
+    name: 'Pottipadu Toll Plaza',
+    highway: 'NH-16 (Vijayawada ➔ Vizag Port)',
+    coordinates: [16.6900, 80.9500],
+    tollFeeCommercialINR: 275,
+    status: 'FASTag Active',
+    lastPassageTime: '22 mins ago'
+  }
+];
 
 export const INITIAL_DRIVERS: Driver[] = [
   {
@@ -10,7 +67,8 @@ export const INITIAL_DRIVERS: Driver[] = [
     rating: 4.85,
     totalTrips: 342,
     experienceYears: 11,
-    assignedVehicleId: 'TRK-1042'
+    assignedVehicleId: 'TRK-1042',
+    hoursDrivenToday: 5.4
   },
   {
     id: 'DRV-102',
@@ -21,7 +79,8 @@ export const INITIAL_DRIVERS: Driver[] = [
     rating: 4.92,
     totalTrips: 410,
     experienceYears: 14,
-    assignedVehicleId: 'TRK-1088'
+    assignedVehicleId: 'TRK-1088',
+    hoursDrivenToday: 4.2
   },
   {
     id: 'DRV-103',
@@ -32,6 +91,7 @@ export const INITIAL_DRIVERS: Driver[] = [
     rating: 4.74,
     totalTrips: 215,
     experienceYears: 7,
+    hoursDrivenToday: 0.0
   },
   {
     id: 'DRV-104',
@@ -42,6 +102,7 @@ export const INITIAL_DRIVERS: Driver[] = [
     rating: 4.90,
     totalTrips: 520,
     experienceYears: 16,
+    hoursDrivenToday: 0.0
   },
   {
     id: 'DRV-105',
@@ -52,7 +113,8 @@ export const INITIAL_DRIVERS: Driver[] = [
     rating: 4.65,
     totalTrips: 180,
     experienceYears: 6,
-    assignedVehicleId: 'TRK-2015'
+    assignedVehicleId: 'TRK-2015',
+    hoursDrivenToday: 6.8 // approaching mandatory rest
   },
   {
     id: 'DRV-106',
@@ -63,6 +125,7 @@ export const INITIAL_DRIVERS: Driver[] = [
     rating: 4.88,
     totalTrips: 290,
     experienceYears: 9,
+    hoursDrivenToday: 0.0
   },
   {
     id: 'DRV-107',
@@ -73,6 +136,7 @@ export const INITIAL_DRIVERS: Driver[] = [
     rating: 4.70,
     totalTrips: 375,
     experienceYears: 12,
+    hoursDrivenToday: 8.0
   },
   {
     id: 'DRV-108',
@@ -83,7 +147,8 @@ export const INITIAL_DRIVERS: Driver[] = [
     rating: 4.81,
     totalTrips: 160,
     experienceYears: 5,
-    assignedVehicleId: 'TRK-1092'
+    assignedVehicleId: 'TRK-1092',
+    hoursDrivenToday: 1.5
   }
 ];
 
@@ -140,6 +205,7 @@ export const INITIAL_VEHICLES: Vehicle[] = [
     pollutionCertExpiry: '2027-03-30',
     lastServiceDate: '2026-09-15',
     nextServiceKm: 150000,
+    fastTagBalance: 4850,
     alerts: [
       {
         id: 'ALT-101',
@@ -807,3 +873,4 @@ export const POPULAR_LOCATIONS = [
   { name: 'Kurnool National Highway Transit', coords: [15.8281, 78.0373] as [number, number] },
   { name: 'Tirupati Cargo Terminal', coords: [13.6288, 79.4192] as [number, number] }
 ];
+
