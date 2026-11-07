@@ -12,10 +12,15 @@ import {
   Gauge, 
   MapPin, 
   CheckCircle,
-  Truck
+  Truck,
+  ShieldCheck,
+  CreditCard,
+  Sun,
+  Moon
 } from 'lucide-react';
-import { Vehicle } from '../../types';
-import { getStatusBadgeConfig } from '../../utils/formatters';
+import { Vehicle, TollPlaza } from '../../types';
+import { getStatusBadgeConfig, formatCurrencyINR } from '../../utils/formatters';
+import { INITIAL_TOLL_PLAZAS } from '../../data/mockData';
 
 interface LiveOperationsMapProps {
   vehicles: Vehicle[];
@@ -30,11 +35,16 @@ export const LiveOperationsMap: React.FC<LiveOperationsMapProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const routesLayerRef = useRef<L.LayerGroup | null>(null);
+  const tollsLayerRef = useRef<L.LayerGroup | null>(null);
 
   const [mapFilter, setMapFilter] = useState<'all' | 'running' | 'alerts' | 'idle'>('all');
   const [selectedPinVehicle, setSelectedPinVehicle] = useState<Vehicle | null>(null);
+  const [selectedToll, setSelectedToll] = useState<TollPlaza | null>(null);
+  const [showTolls, setShowTolls] = useState(true);
+  const [mapTheme, setMapTheme] = useState<'dark' | 'light'>('dark');
 
   // Filter vehicles for map
   const displayVehicles = vehicles.filter((v) => {
@@ -57,25 +67,33 @@ export const LiveOperationsMap: React.FC<LiveOperationsMapProps> = ({
         attributionControl: false
       });
 
-      // CartoDB Dark Matter Tiles (stunning dark theme for enterprise logistics)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        subdomains: 'abcd',
-      }).addTo(map);
+      // CartoDB Dark Matter Tiles
+      const tileLayer = L.tileLayer(
+        mapTheme === 'dark'
+          ? 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png'
+          : 'https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png',
+        {
+          maxZoom: 19,
+          subdomains: 'abcd',
+        }
+      ).addTo(map);
+
+      tileLayerRef.current = tileLayer;
 
       // Attribution
       L.control.attribution({ position: 'bottomright', prefix: '© OpenStreetMap | CartoDB' }).addTo(map);
 
       const markersGroup = L.layerGroup().addTo(map);
       const routesGroup = L.layerGroup().addTo(map);
+      const tollsGroup = L.layerGroup().addTo(map);
 
       markersLayerRef.current = markersGroup;
       routesLayerRef.current = routesGroup;
+      tollsLayerRef.current = tollsGroup;
       mapInstanceRef.current = map;
     }
 
     return () => {
-      // cleanup on unmount
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -83,7 +101,17 @@ export const LiveOperationsMap: React.FC<LiveOperationsMapProps> = ({
     };
   }, []);
 
-  // Update Markers & Polylines whenever displayVehicles change or mapFilter changes
+  // Switch Theme Tiles
+  useEffect(() => {
+    if (!mapInstanceRef.current || !tileLayerRef.current) return;
+    tileLayerRef.current.setUrl(
+      mapTheme === 'dark'
+        ? 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png'
+    );
+  }, [mapTheme]);
+
+  // Update Markers & Polylines whenever displayVehicles change
   useEffect(() => {
     const map = mapInstanceRef.current;
     const markersGroup = markersLayerRef.current;
@@ -133,6 +161,7 @@ export const LiveOperationsMap: React.FC<LiveOperationsMapProps> = ({
       const marker = L.marker(vehicle.coordinates, { icon: customIcon });
 
       marker.on('click', () => {
+        setSelectedToll(null);
         setSelectedPinVehicle(vehicle);
         map.panTo(vehicle.coordinates, { animate: true });
       });
@@ -141,7 +170,6 @@ export const LiveOperationsMap: React.FC<LiveOperationsMapProps> = ({
 
       // Draw polyline routes for in-transit vehicles
       if (vehicle.currentTrip && vehicle.currentTrip.routeWaypoints.length > 1) {
-        // Full route line in subtle cyan
         L.polyline(vehicle.currentTrip.routeWaypoints, {
           color: '#0d9488',
           weight: 3,
@@ -149,7 +177,6 @@ export const LiveOperationsMap: React.FC<LiveOperationsMapProps> = ({
           dashArray: '6, 8'
         }).addTo(routesGroup);
 
-        // Active segment (from origin to current location) in bright teal
         const originCoords = vehicle.currentTrip.originCoords;
         L.polyline([originCoords, vehicle.coordinates], {
           color: '#14b8a6',
@@ -159,6 +186,50 @@ export const LiveOperationsMap: React.FC<LiveOperationsMapProps> = ({
       }
     });
   }, [displayVehicles]);
+
+  // Update Toll Plazas
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const tollsGroup = tollsLayerRef.current;
+    if (!map || !tollsGroup) return;
+
+    tollsGroup.clearLayers();
+
+    if (!showTolls) return;
+
+    INITIAL_TOLL_PLAZAS.forEach((toll) => {
+      const tollHtml = `
+        <div class="relative group cursor-pointer" style="transform: translate(-50%, -50%);">
+          <div class="relative flex items-center justify-center w-6 h-6 rounded-lg bg-sky-950 border border-sky-400 text-sky-400 shadow-md">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect width="20" height="14" x="2" y="5" rx="2"/>
+              <line x1="2" x2="22" y1="10" y2="10"/>
+            </svg>
+          </div>
+          <div class="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900/90 text-[9px] font-mono font-bold text-sky-300 px-1 py-0.2 rounded border border-sky-800 shadow pointer-events-none">
+            FASTag
+          </div>
+        </div>
+      `;
+
+      const tollIcon = L.divIcon({
+        className: 'custom-toll-marker',
+        html: tollHtml,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+
+      const marker = L.marker(toll.coordinates, { icon: tollIcon });
+
+      marker.on('click', () => {
+        setSelectedPinVehicle(null);
+        setSelectedToll(toll);
+        map.panTo(toll.coordinates, { animate: true });
+      });
+
+      marker.addTo(tollsGroup);
+    });
+  }, [showTolls]);
 
   // Center on fleet
   const handleCenterFleet = () => {
@@ -221,8 +292,31 @@ export const LiveOperationsMap: React.FC<LiveOperationsMapProps> = ({
           </button>
         </div>
 
-        {/* Map View Helpers */}
+        {/* Map View Helpers: Toll toggle & Fit Bounds */}
         <div className="pointer-events-auto flex items-center gap-2">
+          {/* Toll plaza toggle */}
+          <button
+            onClick={() => setShowTolls(!showTolls)}
+            className={`flex items-center gap-1.5 px-3 py-2 border rounded-xl text-xs font-semibold backdrop-blur-md shadow-xl transition-all ${
+              showTolls
+                ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                : 'bg-slate-900/90 text-slate-400 border-slate-700/80 hover:text-white'
+            }`}
+            title="Toggle FASTag Toll Plazas & Checkposts"
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">FASTag Tolls</span>
+          </button>
+
+          {/* Theme switcher */}
+          <button
+            onClick={() => setMapTheme(mapTheme === 'dark' ? 'light' : 'dark')}
+            className="p-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-slate-300 hover:text-white backdrop-blur-md shadow-xl transition-all"
+            title="Switch Map Tile Theme"
+          >
+            {mapTheme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-teal-400" />}
+          </button>
+
           <button
             onClick={handleCenterFleet}
             className="flex items-center gap-1.5 px-3 py-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs font-semibold text-slate-200 backdrop-blur-md shadow-xl transition-all"
@@ -248,9 +342,43 @@ export const LiveOperationsMap: React.FC<LiveOperationsMapProps> = ({
           <span className="w-3 h-3 rounded-full bg-rose-500"></span>
           <span>Maintenance</span>
         </div>
-        <div className="h-3 w-px bg-slate-700" />
-        <span className="text-[11px] text-slate-400 font-mono">Freight Corridors: NH-65, NH-44, NH-16</span>
+        <div className="flex items-center gap-1.5 font-medium text-sky-400">
+          <CreditCard className="w-3.5 h-3.5" />
+          <span>FASTag Toll</span>
+        </div>
       </div>
+
+      {/* Toll Plaza Details Card */}
+      {selectedToll && (
+        <div className="absolute bottom-4 right-4 z-20 w-80 bg-slate-900/95 border border-sky-500/40 rounded-2xl shadow-2xl p-4 backdrop-blur-md animate-in slide-in-from-bottom-3">
+          <div className="flex items-start justify-between pb-2 border-b border-slate-800">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-sky-400 block flex items-center gap-1">
+                <CreditCard className="w-3 h-3" /> FASTag Highway Gateway
+              </span>
+              <h3 className="font-bold text-white text-sm mt-0.5">{selectedToll.name}</h3>
+              <p className="text-[11px] text-slate-400">{selectedToll.highway}</p>
+            </div>
+            <button onClick={() => setSelectedToll(null)} className="text-slate-400 hover:text-white text-xs p-1">✕</button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 my-3 text-xs">
+            <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 uppercase">Commercial MAV Toll</span>
+              <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5">{formatCurrencyINR(selectedToll.tollFeeCommercialINR)}</div>
+            </div>
+            <div className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+              <span className="text-[10px] text-slate-400 uppercase">Status</span>
+              <div className="text-xs font-bold text-sky-400 mt-0.5">{selectedToll.status}</div>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+            <span>Last passage: <strong className="text-slate-200">{selectedToll.lastPassageTime}</strong></span>
+            <span className="text-emerald-400 font-medium">Weigh-in-Motion Active</span>
+          </div>
+        </div>
+      )}
 
       {/* Quick Pin Details Popup Card (overlay on map) */}
       {selectedPinVehicle && (
@@ -358,4 +486,3 @@ export const LiveOperationsMap: React.FC<LiveOperationsMapProps> = ({
     </div>
   );
 };
-
